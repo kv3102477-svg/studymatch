@@ -16,3 +16,5 @@ nbproject/private/
 src/main/resources/application-local.properties
 .keys/
 .backups/
+
+!/SQL de base de datos.sql
