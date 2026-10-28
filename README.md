@@ -1,6 +1,19 @@
 # StudyMatch Grupo 1
 Equipo_1 Universidad Tecnológica del Perú
 
+# Nombre Proyecto
+Sistema de Emparejamiento y Seguimiento de Mentorías - UTP Lima Sur
+
+## Integrantes
+- Untiveros Vargas Yummy Lucero
+- Quihui Rodriguez Frank Amadeo
+- Mostacero Cortez Orlando
+- Regalado Vasquez Kevin Jean Pierre
+
+## Carrera
+- Ingenieria de sistemas e informatica
+
+
 Plataforma web para el intercambio de tutorías entre estudiantes de la Universidad Tecnológica del Perú. Permite encontrar compañeros con materias y horarios compatibles, coordinar sesiones de estudio y registrar el progreso académico.
 
 ## Funcionalidades
