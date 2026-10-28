@@ -1,6 +1,18 @@
 target/
-# Configuración local con la contraseña que el usuario decidió introducir aquí.
-src/main/resources/application.properties
+nbproject/private/
+.idea/
+.vscode/
+*.iml
+*.log
+*.zip
+*.war
+*.jar
+*.pdf
+*.doc
+*.docx
+*.sql
 .env
 .env.*
+src/main/resources/application-local.properties
+.keys/
 .backups/

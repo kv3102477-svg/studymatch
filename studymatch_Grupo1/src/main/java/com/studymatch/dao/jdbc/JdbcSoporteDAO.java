@@ -46,4 +46,7 @@ public class JdbcSoporteDAO implements SoporteDAO {
             mensaje
         );
     }
+
+    @Override public int contarReportes(long reportadoId){return ((Number)sql.one("SELECT COUNT(*) AS cantidad FROM solicitud_soporte WHERE tipo='REPORTE' AND reportado_id=?",reportadoId).get("cantidad")).intValue();}
+    @Override public int priorizar(long solicitudId){return sql.update("UPDATE solicitud_soporte SET prioridad='ALTA' WHERE id=?",solicitudId);}
 }

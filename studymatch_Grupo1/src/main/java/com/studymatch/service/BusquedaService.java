@@ -4,6 +4,7 @@ import static com.studymatch.service.Validaciones.id;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 import com.studymatch.dao.EstudianteDAO;
+import com.studymatch.dao.DisponibilidadDAO;
 import com.studymatch.dao.MateriaDAO;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -20,10 +21,12 @@ public class BusquedaService {
 
     private final EstudianteDAO estudianteDAO;
     private final MateriaDAO materiaDAO;
+    private final DisponibilidadDAO disponibilidadDAO;
 
-    public BusquedaService(EstudianteDAO estudianteDAO, MateriaDAO materiaDAO) {
+    public BusquedaService(EstudianteDAO estudianteDAO, MateriaDAO materiaDAO, DisponibilidadDAO disponibilidadDAO) {
         this.estudianteDAO = estudianteDAO;
         this.materiaDAO = materiaDAO;
+        this.disponibilidadDAO = disponibilidadDAO;
     }
 
     /** Aplica los filtros y reúne las materias y horarios compatibles. */
@@ -46,6 +49,9 @@ public class BusquedaService {
         String career,
         String role
     ) {
+        if (recommended && (materiaDAO.listarPropias(student).isEmpty()
+            || disponibilidadDAO.listar(student).isEmpty())) throw new ResponseStatusException(
+                BAD_REQUEST, "Completa tus materias y disponibilidad para ver sugerencias");
         if (day != null && (day < 1 || day > 7)) throw new ResponseStatusException(
             BAD_REQUEST,
             "Selecciona un día válido."

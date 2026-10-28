@@ -24,7 +24,7 @@ loadHours = async function () {
 };
 loadSubscriptions = async function () {
     await originalReferenceSubscriptions();
-    const paid = plans.find((p) => Number(p.precio) > 0),
+    const paid = plans.find((p) => Number(p.precio) > 0 && /seman|ciclo/i.test(p.periodo)) || plans.find((p) => Number(p.precio) > 0),
         active = subscriptions.find((s) => ["ACTIVO", "TRIAL"].includes(s.estado_actual));
     document
         .querySelectorAll("[data-plan-price]")
@@ -37,6 +37,12 @@ loadSubscriptions = async function () {
                           ? `${paid.moneda} ${Number(paid.precio).toFixed(2)}`
                           : "No disponible"),
         );
+    for (const [mode, monthly] of [["mensual", true], ["semestral", false]]) {
+        const plan = plans.find(p => Number(p.precio) > 0 &&
+            (monthly ? /mes/i.test(p.periodo) && !/seman/i.test(p.periodo) : /seman|ciclo/i.test(p.periodo)));
+        const price = $("radio-modalidad-" + mode)?.closest("label")?.querySelector("[data-plan-price]");
+        if (price && plan) price.textContent = `${plan.moneda} ${Number(plan.precio).toFixed(2)}`;
+    }
     setText(
         "plan-summary-description",
         active
@@ -63,7 +69,7 @@ loadSubscriptions = async function () {
         if ($(id)) $(id).disabled = !paid;
 };
 function openReferenceOffer() {
-    const plan = plans.find((p) => Number(p.precio) > 0);
+    const plan = plans.find((p) => Number(p.precio) > 0 && /seman|ciclo/i.test(p.periodo)) || plans.find((p) => Number(p.precio) > 0);
     if (!plan) throw new Error("No hay planes disponibles registrados.");
     openPlan(plan.id);
     show("contratacion-vista-oferta", true);

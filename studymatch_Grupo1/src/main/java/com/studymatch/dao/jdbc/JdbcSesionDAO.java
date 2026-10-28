@@ -51,8 +51,10 @@ public class JdbcSesionDAO implements SesionDAO {
             "SELECT COALESCE(SUM(CASE WHEN mentor_id=? THEN duracion_real_min ELSE 0 END),0)/60.0 " +
                 "AS horas_ensenadas, " +
                 "COALESCE(SUM(CASE WHEN aprendiz_id=? THEN duracion_real_min ELSE 0 END),0)/60.0 AS horas_aprendidas, " +
-                "COUNT(*) AS sesiones_completadas FROM sesion WHERE estado='COMPLETADA' AND " +
+                "COUNT(*) AS sesiones_completadas, EXISTS(SELECT 1 FROM sesion r WHERE (r.mentor_id=? OR r.aprendiz_id=?) AND r.estado='COMPLETADA' AND (r.revision_horas=true OR r.duracion_real_min IS NULL OR r.duracion_real_min<15)) AS en_revision FROM sesion WHERE estado='COMPLETADA' AND duracion_real_min>=15 AND revision_horas=false AND " +
                 "(mentor_id=? OR aprendiz_id=?)",
+            estudianteId,
+            estudianteId,
             estudianteId,
             estudianteId,
             estudianteId,
@@ -105,7 +107,7 @@ public class JdbcSesionDAO implements SesionDAO {
     @Override
     public Map<String, Object> buscarParticipante(long sesionId, long estudianteId) {
         return sql.one(
-            "SELECT s.*, m.nombre AS materia, p.nombre AS proponente, r.nombre AS receptor " +
+            "SELECT s.*, (SELECT MIN(n.creada_en) FROM notificacion n WHERE n.tipo_evento='PROPUESTA_SESION' AND n.referencia_id=s.id) AS creacion_efectiva, m.nombre AS materia, p.nombre AS proponente, r.nombre AS receptor " +
                 "FROM sesion s JOIN materia m ON m.id=s.materia_id JOIN estudiante p ON p.id=s.proponente_id " +
                 "JOIN estudiante r ON r.id=s.receptor_id WHERE s.id=? AND (s.proponente_id=? OR " +
                 "s.receptor_id=?) FOR UPDATE OF s",
@@ -149,7 +151,8 @@ public class JdbcSesionDAO implements SesionDAO {
     @Override
     public int completar(long duracionMinutos, long sesionId) {
         return sql.update(
-            "UPDATE sesion SET estado='COMPLETADA',duracion_real_min=?,origen_duracion='REAL' WHERE id=?",
+            "UPDATE sesion SET estado='COMPLETADA',duracion_real_min=?,origen_duracion='REAL',revision_horas=(?<15) WHERE id=?",
+            duracionMinutos,
             duracionMinutos,
             sesionId
         );
@@ -158,5 +161,20 @@ public class JdbcSesionDAO implements SesionDAO {
     @Override
     public int guardarEnlace(String enlace, long sesionId) {
         return sql.update("UPDATE sesion SET enlace_videollamada=? WHERE id=?", enlace, sesionId);
+    }
+
+    @Override
+    public int reprogramar(java.time.LocalDateTime fecha, int minutos, long sesionId) {
+        return sql.update("UPDATE sesion SET fecha_hora=?,duracion_programada_min=?,estado='PROPUESTA',reprogramaciones=reprogramaciones+1 WHERE id=?",fecha,minutos,sesionId);
+    }
+    @Override
+    public int completarEstimado(long sesionId) {
+        return sql.update("UPDATE sesion SET estado='COMPLETADA',duracion_real_min=duracion_programada_min, "
+            + "origen_duracion='ESTIMADO',fin_real=COALESCE(fin_real,fecha_hora+duracion_programada_min*INTERVAL '1 minute') WHERE id=?",sesionId);
+    }
+    @Override
+    public int cerrarSinDuracion(long sesionId) {
+        return sql.update("UPDATE sesion SET estado='COMPLETADA',duracion_real_min=NULL,revision_horas=true, "
+            + "fin_real=CASE WHEN inicio_real IS NULL THEN NULL ELSE COALESCE(fin_real,CURRENT_TIMESTAMP) END WHERE id=?",sesionId);
     }
 }

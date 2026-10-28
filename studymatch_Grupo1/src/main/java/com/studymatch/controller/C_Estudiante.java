@@ -18,15 +18,18 @@ public class C_Estudiante {
     private final BusquedaService busquedaService;
     private final CatalogoService catalogoService;
     private final EstudianteService estudianteService;
+    private final com.studymatch.service.SuscripcionService suscripcionService;
 
     public C_Estudiante(
         BusquedaService busquedaService,
         CatalogoService catalogoService,
-        EstudianteService estudianteService
+        EstudianteService estudianteService,
+        com.studymatch.service.SuscripcionService suscripcionService
     ) {
         this.busquedaService = busquedaService;
         this.catalogoService = catalogoService;
         this.estudianteService = estudianteService;
+        this.suscripcionService = suscripcionService;
     }
 
     private long student(HttpSession session) {
@@ -48,6 +51,7 @@ public class C_Estudiante {
         @RequestParam(defaultValue = "") String carrera,
         @RequestParam(defaultValue = "") String rol
     ) {
+        if (dia != null || !carrera.isBlank()) suscripcionService.exigirPro(student(s));
         return busquedaService.search(student(s), q, recomendados, curso.trim(), dia, carrera, rol);
     }
 

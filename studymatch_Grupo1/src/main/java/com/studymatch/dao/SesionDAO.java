@@ -53,4 +53,11 @@ public interface SesionDAO {
 
     /** Actualiza el enlace de reunión proporcionado por el usuario. */
     int guardarEnlace(String enlace, long sesionId);
+
+    /** Guarda una propuesta de horario alternativa. */
+    int reprogramar(java.time.LocalDateTime fecha, int minutos, long sesionId);
+    /** Registra la duración prevista como estimada, sin inventar marcas de asistencia. */
+    int completarEstimado(long sesionId);
+    /** Cierra una sesión sin asignarle una duración que no se pudo calcular. */
+    int cerrarSinDuracion(long sesionId);
 }

@@ -104,6 +104,13 @@ studentCard = function (s) {
 loadSearch = async function () {
     if (!currentUser) return;
     const request = ++designSearch;
+    const access = await api("/suscripciones/acceso");
+    for (const id of ["quick-filter-day", "filter-career"]) {
+        const field = $(id);
+        field.disabled = !access.pro;
+        field.title = access.pro ? "" : "Filtro avanzado disponible con Pro-Ciclo";
+        if (!access.pro) field.value = id === "filter-career" ? "Todos" : "";
+    }
     const params = new URLSearchParams({
         q: $("search-input").value.trim(),
         curso: $("quick-filter-course").value.trim(),
@@ -225,7 +232,7 @@ const faqs = [
     ],
     [
         "¿Se realizan cobros reales?",
-        "La pasarela está en modo de demostración: no cobra dinero ni activa suscripciones pagadas.",
+        "La pasarela está en modo de demostración: no cobra dinero real. Al aprobar la simulación se activa Pro-Ciclo y se guarda un comprobante identificado como DEMO.",
     ],
     [
         "¿Cómo consigo insignias?",
@@ -299,9 +306,14 @@ document.addEventListener("DOMContentLoaded", () => {
         renderFaq();
     });
     renderFaq();
-    on("btn-descargar-cert-pdf", () => {
-        document.body.dataset.print = "constancia";
-        window.print();
+    on("btn-descargar-cert-pdf", async () => {
+        const boton=$("btn-descargar-cert-pdf");
+        const titulo=boton.textContent;boton.disabled=true;boton.textContent="Generando PDF…";
+        try{
+            const documentos=await api("/certificados");
+            const url=documentos.length?"/api/certificados/"+encodeURIComponent(documentos[0].codigo)+"/pdf":"/api/perfil/constancia/pdf";
+            await downloadDocument(url,documentos.length?"Certificado_StudyMatch.pdf":"Constancia_StudyMatch.pdf");
+        }finally{boton.textContent=titulo;boton.disabled=false;}
     });
     window.addEventListener("afterprint", () => delete document.body.dataset.print);
     const reportModal = () => show("modal-reportar-usuario", false),

@@ -56,10 +56,6 @@ public class C_Sesion {
         @PathVariable long id,
         @RequestBody Map<String, Object> input
     ) {
-        sesionService.rate(student(s), id, input);
-        return Map.of(
-            "mensaje",
-            "Calificación guardada. El comentario queda pendiente de moderación."
-        );
+        return sesionService.rate(student(s), id, input);
     }
 }

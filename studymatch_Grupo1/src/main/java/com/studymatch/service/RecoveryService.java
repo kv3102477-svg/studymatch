@@ -191,4 +191,9 @@ public class RecoveryService {
         );
         tokenDAO.invalidarRecuperacion(((Number) row.get("estudiante_id")).longValue());
     }
+
+    /** Transporte de avisos del sistema. Los tests sustituyen esta frontera con un doble. */
+    public void sendAviso(String correo,String titulo,String mensaje){
+        sendMail(correo,titulo,mensaje,renderMail(titulo,mensaje,null,null,0));
+    }
 }

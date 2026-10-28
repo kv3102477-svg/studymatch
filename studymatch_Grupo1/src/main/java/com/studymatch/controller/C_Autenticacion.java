@@ -71,7 +71,15 @@ public class C_Autenticacion {
 
     @PostMapping("/logout")
     public Map<String, Object> logout(HttpSession session) {
-        session.invalidate();
+        try {
+            session.invalidate();
+        } catch (IllegalStateException expired) {
+            // Cerrar una sesión que ya venció mantiene al usuario desconectado.
+        } catch (RuntimeException error) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+                "No se pudo cerrar la sesión. Inténtalo nuevamente.");
+        }
         return Map.of("mensaje", "Sesión cerrada.");
     }
 }

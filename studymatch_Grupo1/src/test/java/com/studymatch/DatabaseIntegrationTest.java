@@ -952,7 +952,9 @@ class DatabaseIntegrationTest {
         mvc.perform(get("/api/estudiantes").param("recomendados", "true").session(session(a)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].id").value(b));
-        assertThat(busquedaService.search(noSubject, "", true)).isEmpty();
+        assertThatThrownBy(() -> busquedaService.search(noSubject, "", true))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Completa tus materias y disponibilidad para ver sugerencias");
     }
 
     @Test
