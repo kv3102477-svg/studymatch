@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+    <head
+        ><meta charset="UTF-8" /><meta
+            name="viewport"
+            content="width=device-width,initial-scale=1"
+        /><title th:text="${title}">StudyMatch</title></head
+    >
+    <body
+        style="
+            margin: 0;
+            padding: 0;
+            background: #f5f6f8;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #20242c;
+        "
+    >
+        <div style="display: none; max-height: 0; overflow: hidden" th:text="${description}"></div>
+        <table
+            role="presentation"
+            width="100%"
+            cellspacing="0"
+            cellpadding="0"
+            style="background: #f5f6f8"
+            ><tr
+                ><td align="center" style="padding: 36px 16px">
+                    <table
+                        role="presentation"
+                        width="100%"
+                        cellspacing="0"
+                        cellpadding="0"
+                        style="max-width: 500px"
+                    >
+                        <tr
+                            ><td style="padding: 0 8px 24px">
+                                <table role="presentation" cellspacing="0" cellpadding="0"
+                                    ><tr>
+                                        <td style="padding-right: 12px"
+                                            ><img
+                                                src="cid:studymatch-logo"
+                                                width="44"
+                                                height="44"
+                                                alt="StudyMatch"
+                                                style="
+                                                    display: block;
+                                                    border: 0;
+                                                    border-radius: 11px;
+                                                "
+                                        /></td>
+                                        <td
+                                            ><div
+                                                style="
+                                                    font-size: 21px;
+                                                    font-weight: 700;
+                                                    letter-spacing: -0.5px;
+                                                    color: #20242c;
+                                                "
+                                                >StudyMatch</div
+                                            ><div
+                                                style="
+                                                    font-size: 11px;
+                                                    color: #747b87;
+                                                    margin-top: 4px;
+                                                "
+                                                >UTP · Intercambio de tutorías</div
+                                            ></td
+                                        >
+                                    </tr></table
+                                ></td
+                            ></tr
+                        >
+                        <tr
+                            ><td
+                                style="background: #ffffff; border-radius: 18px; padding: 32px 28px"
+                            >
+                                <div
+                                    style="
+                                        font-size: 10px;
+                                        font-weight: 700;
+                                        letter-spacing: 1.5px;
+                                        color: #b30832;
+                                        margin-bottom: 14px;
+                                    "
+                                    >TU CUENTA STUDYMATCH</div
+                                >
+                                <h1
+                                    style="
+                                        font-size: 25px;
+                                        line-height: 1.25;
+                                        letter-spacing: -0.6px;
+                                        margin: 0 0 14px;
+                                        font-weight: 700;
+                                    "
+                                    th:text="${title}"
+                                    >Verifica tu correo</h1
+                                >
+                                <p
+                                    style="
+                                        font-size: 14px;
+                                        line-height: 1.7;
+                                        color: #68707d;
+                                        margin: 0 0 24px;
+                                    "
+                                    th:text="${description}"
+                                    >Confirma tu correo para empezar a aprender y compartir.</p
+                                >
+                                <table
+                                    th:if="${code != null}"
+                                    role="presentation"
+                                    width="100%"
+                                    cellspacing="0"
+                                    cellpadding="0"
+                                    ><tr
+                                        ><td
+                                            align="center"
+                                            style="
+                                                background: #fff0f3;
+                                                border-radius: 12px;
+                                                padding: 22px 12px;
+                                            "
+                                        >
+                                            <div
+                                                style="
+                                                    font-size: 10px;
+                                                    color: #8e1736;
+                                                    letter-spacing: 1px;
+                                                    margin-bottom: 10px;
+                                                "
+                                                >CÓDIGO DE VERIFICACIÓN</div
+                                            >
+                                            <div
+                                                style="
+                                                    font-family:
+                                                        Consolas, &quot;Courier New&quot;, monospace;
+                                                    font-size: 34px;
+                                                    font-weight: 700;
+                                                    letter-spacing: 7px;
+                                                    color: #b30832;
+                                                    white-space: nowrap;
+                                                "
+                                                th:text="${code}"
+                                                >000000</div
+                                            >
+                                        </td></tr
+                                    ></table
+                                >
+                                <table
+                                    th:if="${actionUrl != null}"
+                                    role="presentation"
+                                    cellspacing="0"
+                                    cellpadding="0"
+                                    ><tr
+                                        ><td style="border-radius: 10px; background: #b30832"
+                                            ><a
+                                                th:href="${actionUrl}"
+                                                style="
+                                                    display: inline-block;
+                                                    padding: 14px 22px;
+                                                    color: #ffffff;
+                                                    text-decoration: none;
+                                                    font-size: 13px;
+                                                    font-weight: 700;
+                                                "
+                                                >Restablecer contraseña</a
+                                            ></td
+                                        ></tr
+                                    ></table
+                                >
+                                <p
+                                    style="
+                                        font-size: 12px;
+                                        line-height: 1.6;
+                                        color: #747b87;
+                                        margin: 18px 0 0;
+                                    "
+                                    >Por tu seguridad,
+                                    <span th:text="${code != null ? 'este código' : 'este enlace'}"
+                                        >este código</span
+                                    >
+                                    vence en
+                                    <strong th:text="${minutes + ' minutos'}">10 minutos</strong>.
+                                    No lo compartas con otras personas.</p
+                                >
+                                <p
+                                    th:if="${actionUrl != null}"
+                                    style="
+                                        font-size: 11px;
+                                        line-height: 1.6;
+                                        color: #747b87;
+                                        margin-top: 18px;
+                                        word-break: break-all;
+                                    "
+                                    >Si el botón no funciona, copia este enlace en tu navegador:<br /><a
+                                        th:href="${actionUrl}"
+                                        th:text="${actionUrl}"
+                                        style="color: #b30832"
+                                        >Enlace de recuperación</a
+                                    ></p
+                                >
+                                <div
+                                    style="height: 1px; background: #f0f1f3; margin: 24px 0 18px"
+                                ></div>
+                                <p
+                                    style="
+                                        font-size: 11px;
+                                        line-height: 1.7;
+                                        color: #8b919b;
+                                        margin: 0;
+                                    "
+                                    >Si no solicitaste esta acción, puedes ignorar este mensaje.</p
+                                >
+                            </td></tr
+                        >
+                        <tr
+                            ><td
+                                align="center"
+                                style="
+                                    padding: 20px 16px 0;
+                                    font-size: 11px;
+                                    line-height: 1.7;
+                                    color: #9298a2;
+                                "
+                                >StudyMatch · Aprende y comparte conocimiento.<br />Este correo se
+                                envía automáticamente.</td
+                            ></tr
+                        >
+                    </table></td
+                ></tr
+            ></table
+        ></body
+    ></html
+>

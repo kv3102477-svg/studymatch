@@ -1,0 +1,7 @@
+target/
+# Configuración local con la contraseña que el usuario decidió introducir aquí.
+src/main/resources/application.properties
+.env
+.env.*
+
+.backups/
