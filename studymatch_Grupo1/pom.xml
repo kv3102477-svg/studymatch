@@ -11,7 +11,7 @@
 	<groupId>com.studymatch</groupId>
 	<artifactId>studymatch-backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>studymatch</name>
+	<name>StudyMatch Grupo 1</name>
 	<description>Backend para StudyMatch UTP</description>
 	<properties>
 		<java.version>17</java.version>
