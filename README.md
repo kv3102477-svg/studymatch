@@ -13,7 +13,6 @@ Sistema de Emparejamiento y Seguimiento de Mentorías - UTP Lima Sur
 ## Carrera
 - Ingenieria de sistemas e informatica
 
-
 Plataforma web para el intercambio de tutorías entre estudiantes de la Universidad Tecnológica del Perú. Permite encontrar compañeros con materias y horarios compatibles, coordinar sesiones de estudio y registrar el progreso académico.
 
 ## Funcionalidades
@@ -96,4 +95,3 @@ La aprobación permite guardar y activar la suscripción en la plataforma.
 
 Cada integrante trabaja en su rama personal. Los cambios se integran
 en `main` mediante Pull Requests.
-
