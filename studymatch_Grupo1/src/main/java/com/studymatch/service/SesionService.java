@@ -36,6 +36,8 @@ public class SesionService {
     private final NotificacionDAO notificacionDAO;
     private final SesionDAO sesionDAO;
     private final ProgresoService progresoService;
+    private final ModeracionService moderacion;
+    private final com.studymatch.dao.EmparejamientoDAO emparejamientos;
     private final Clock clock = Clock.system(ZoneId.of("America/Bogota"));
 
     public SesionService(
@@ -45,7 +47,9 @@ public class SesionService {
         MateriaDAO materiaDAO,
         NotificacionDAO notificacionDAO,
         SesionDAO sesionDAO,
-        ProgresoService progresoService
+        ProgresoService progresoService,
+        ModeracionService moderacion,
+        com.studymatch.dao.EmparejamientoDAO emparejamientos
     ) {
         this.calificacionDAO = calificacionDAO;
         this.disponibilidadDAO = disponibilidadDAO;
@@ -54,6 +58,8 @@ public class SesionService {
         this.notificacionDAO = notificacionDAO;
         this.sesionDAO = sesionDAO;
         this.progresoService = progresoService;
+        this.moderacion=moderacion;
+        this.emparejamientos=emparejamientos;
     }
 
     private LocalDateTime now() {
@@ -132,9 +138,9 @@ public class SesionService {
         );
         int duration = (int) requestedDuration;
         LocalDateTime date = LocalDateTime.parse(text(input, "fecha_hora", 30));
-        if (!date.isAfter(now())) throw new ResponseStatusException(
+        if (!date.isAfter(now().plusHours(24))) throw new ResponseStatusException(
             BAD_REQUEST,
-            "Selecciona una fecha futura."
+            "Programa la sesión con más de 24 horas de anticipación."
         );
         validateProposal(student, other, subject, mentor, date, duration);
         long session = sesionDAO.crearPropuesta(
@@ -166,11 +172,53 @@ public class SesionService {
     ) {
         var row = sesionDAO.buscarParticipante(session, student);
         String state = row.get("estado").toString();
+        Object fechaCreacion=row.get("creada_en");
+        if(fechaCreacion==null)fechaCreacion=row.get("creacion_efectiva");
+        boolean rechazo=action.equals("rechazar");
+        if (state.equals("PROPUESTA") && fechaCreacion instanceof java.sql.Timestamp creada
+            && !creada.toLocalDateTime().plusHours(72).isAfter(now())
+            && Set.of("aceptar","reprogramar").contains(action)) {
+            throw new ResponseStatusException(CONFLICT,"La propuesta venció después de 72 horas.");
+        }
+        if (action.equals("rechazar")) {
+            if (id(row,"receptor_id") != student || !state.equals("PROPUESTA"))
+                throw new ResponseStatusException(CONFLICT,"La propuesta no se puede rechazar.");
+            action="cancelar";
+            input=Map.of("motivo","Propuesta rechazada");
+        }
+        if (action.equals("reprogramar")) {
+            if (!state.equals("PROPUESTA")) throw new ResponseStatusException(CONFLICT,"La propuesta no se puede reprogramar.");
+            if (((Number) row.getOrDefault("reprogramaciones",0)).intValue()>=3) {
+                sesionDAO.cancelar(session);
+                sesionDAO.guardarEnlace(null,session);
+                return sesionDAO.buscarParticipante(session,student);
+            }
+            long other=id(row,"proponente_id")==student?id(row,"receptor_id"):id(row,"proponente_id");
+            LocalDateTime fecha=LocalDateTime.parse(text(input,"fecha_hora",30));
+            if(!fecha.isAfter(now().plusHours(24))) throw new ResponseStatusException(BAD_REQUEST,
+                "Programa la sesión con más de 24 horas de anticipación.");
+            int minutos=(int) number(input,"duracion_programada_min");
+            if(minutos>480) throw new ResponseStatusException(BAD_REQUEST,"La sesión puede durar hasta 480 minutos.");
+            validateProposal(student,other,id(row,"materia_id"),id(row,"mentor_id"),fecha,minutos);
+            sesionDAO.reprogramar(fecha,minutos,session);
+            return sesionDAO.buscarParticipante(session,student);
+        }
+        if (action.equals("finalizar_por_caducidad")) {
+            if(!state.equals("EN_CURSO")) throw new ResponseStatusException(CONFLICT,"La sesión no está en curso.");
+            LocalDateTime finProgramado=((java.sql.Timestamp)row.get("fecha_hora")).toLocalDateTime()
+                .plusMinutes(((Number)row.get("duracion_programada_min")).longValue());
+            if(finProgramado.isAfter(now())) throw new ResponseStatusException(CONFLICT,"La sesión todavía no terminó.");
+            sesionDAO.completarEstimado(session);
+            return sesionDAO.buscarParticipante(session,student);
+        }
+
         if (action.equals("aceptar")) {
+            estudianteDAO.perfil(id(row,"proponente_id"));
             if (
                 id(row, "receptor_id") != student || !state.equals("PROPUESTA")
             ) throw new ResponseStatusException(CONFLICT, "La propuesta no se puede aceptar.");
             sesionDAO.confirmar(session);
+            emparejamientos.responder(student,id(row,"proponente_id"),id(row,"materia_id"),true);
             notificacionDAO.crear(
                 id(row, "proponente_id"),
                 "Sesión confirmada",
@@ -184,6 +232,9 @@ public class SesionService {
             ) throw new ResponseStatusException(CONFLICT, "Esta sesión ya no se puede cancelar.");
             String reason = text(input, "motivo", 1000);
             sesionDAO.cancelar(session);
+            if(rechazo)emparejamientos.responder(student,id(row,"proponente_id"),id(row,"materia_id"),false);
+            sesionDAO.guardarEnlace(null,session);
+            try {
             notificacionDAO.crear(
                 id(row, "proponente_id") == student
                     ? id(row, "receptor_id")
@@ -193,6 +244,10 @@ public class SesionService {
                 "SISTEMA",
                 session
             );
+            } catch (org.springframework.mail.MailException error) {
+                notificacionDAO.encolar(id(row,"proponente_id")==student?id(row,"receptor_id"):id(row,"proponente_id"),
+                    "Sesión cancelada","Tu compañero canceló la sesión. Motivo: "+reason,"SISTEMA",session);
+            }
         } else if (action.equals("iniciar")) {
             if (
                 !Set.of("CONFIRMADA", "EN_CURSO").contains(state)
@@ -216,6 +271,14 @@ public class SesionService {
                 CONFLICT,
                 "La sesión no está en curso."
             );
+
+            if (!(row.get("inicio_real") instanceof java.sql.Timestamp inicio)) {
+                sesionDAO.cerrarSinDuracion(session);
+                return sesionDAO.buscarParticipante(session,student);
+            }
+            if (Duration.between(inicio.toLocalDateTime(),now()).toMinutes()<5
+                && !Boolean.TRUE.equals(input.get("confirmar_duracion_corta")))
+                throw new ResponseStatusException(CONFLICT,"La duración es menor de cinco minutos. Confirma para finalizar.");
             String column =
                 id(row, "proponente_id") == student ? "marca_proponente" : "marca_receptor";
             sesionDAO.marcarFinalizacion(column, now(), session);
@@ -229,7 +292,7 @@ public class SesionService {
                     ((java.sql.Timestamp) marked.get("fin_real")).toLocalDateTime()
                 ).toMinutes();
                 sesionDAO.completar(Math.max(0, minutes), session);
-                progresoService.award(id(marked, "mentor_id"));
+                if (minutes>=15) progresoService.award(id(marked, "mentor_id"));
                 progresoService.refreshStats(id(marked, "mentor_id"));
                 progresoService.refreshStats(id(marked, "aprendiz_id"));
             }
@@ -252,7 +315,7 @@ public class SesionService {
 
     /** Permite calificar una sesión completada dentro del plazo establecido. */
     @Transactional
-    public void rate(long student, long session, Map<String, Object> input) {
+    public Map<String,Object> rate(long student, long session, Map<String, Object> input) {
         var row = sesionDAO.buscarParticipante(session, student);
         if (!"COMPLETADA".equals(row.get("estado"))) throw new ResponseStatusException(
             CONFLICT,
@@ -280,6 +343,8 @@ public class SesionService {
         progresoService.refreshStats(
             id(row, "proponente_id") == student ? id(row, "receptor_id") : id(row, "proponente_id")
         );
+        boolean revision=moderacion.requiereRevision(comment);
+        return Map.of("mensaje",revision?"Gracias por tu opinión. Tu comentario está en revisión":"Calificación guardada.","requiere_moderacion",revision);
     }
 
     public Object sessions(long student) {

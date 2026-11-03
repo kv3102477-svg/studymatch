@@ -82,6 +82,7 @@ public class SupportService {
             subject,
             message
         );
+        if(report && soporteDAO.contarReportes(other)>=3)soporteDAO.priorizar(id);
         return result(id, false);
     }
 

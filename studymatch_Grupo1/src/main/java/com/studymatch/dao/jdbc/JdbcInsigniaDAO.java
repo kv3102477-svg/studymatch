@@ -19,7 +19,7 @@ public class JdbcInsigniaDAO implements InsigniaDAO {
     public List<Map<String, Object>> listarConProgreso(long estudianteId) {
         return sql.list(
             "SELECT i.*, ei.obtenida_en, (SELECT COALESCE(SUM(duracion_real_min),0)/60.0 FROM " +
-                "sesion WHERE mentor_id=? AND estado='COMPLETADA') AS horas_actuales " +
+                "sesion WHERE mentor_id=? AND estado='COMPLETADA' AND duracion_real_min>=15 AND revision_horas=false) AS horas_actuales " +
                 "FROM insignia i LEFT JOIN estudiante_insignia ei ON ei.insignia_id=i.id AND " +
                 "ei.estudiante_id=? ORDER BY i.meta_horas",
             estudianteId,
@@ -33,7 +33,7 @@ public class JdbcInsigniaDAO implements InsigniaDAO {
             "INSERT INTO estudiante_insignia(estudiante_id,insignia_id) SELECT ?,i.id FROM " +
                 "insignia i WHERE i.meta_horas<=" +
                 "(SELECT COALESCE(SUM(duracion_real_min),0)/60.0 FROM sesion WHERE mentor_id=? AND " +
-                "estado='COMPLETADA') ON CONFLICT DO NOTHING",
+                "estado='COMPLETADA' AND duracion_real_min>=15 AND revision_horas=false) ON CONFLICT DO NOTHING",
             estudianteId,
             estudianteId
         );
@@ -50,7 +50,7 @@ public class JdbcInsigniaDAO implements InsigniaDAO {
                 "(SELECT AVG(c.estrellas) FROM calificacion c JOIN sesion cs ON cs.id=c.sesion_id " +
                 "WHERE cs.ciclo_id=s.ciclo_id AND " +
                 "((cs.proponente_id=? AND c.calificador_id=cs.receptor_id) OR (cs.receptor_id=? AND c.calificador_id=cs.proponente_id))) " +
-                "FROM sesion s WHERE s.estado='COMPLETADA' AND s.ciclo_id IS NOT NULL AND " +
+                "FROM sesion s WHERE s.estado='COMPLETADA' AND s.duracion_real_min>=15 AND s.revision_horas=false AND s.ciclo_id IS NOT NULL AND " +
                 "(s.mentor_id=? OR s.aprendiz_id=?) GROUP BY s.ciclo_id " +
                 "ON CONFLICT(estudiante_id,ciclo_id) DO UPDATE SET " +
                 "horas_ensenadas=EXCLUDED.horas_ensenadas,horas_aprendidas=EXCLUDED.horas_aprendidas, " +
@@ -74,7 +74,7 @@ public class JdbcInsigniaDAO implements InsigniaDAO {
                 "WHERE ei.estudiante_id=e.id ORDER BY i.meta_horas DESC LIMIT 1) AS insignia " +
                 "FROM sesion s JOIN estudiante e ON e.id=s.mentor_id JOIN ciclo_academico ca ON " +
                 "ca.id=s.ciclo_id AND ca.activo=true " +
-                "WHERE s.estado='COMPLETADA' AND e.cuenta_activa=true GROUP BY e.id HAVING " +
+                "WHERE s.estado='COMPLETADA' AND s.duracion_real_min>=15 AND s.revision_horas=false AND e.cuenta_activa=true GROUP BY e.id HAVING " +
                 "SUM(s.duracion_real_min)>0 " +
                 "ORDER BY horas_ensenadas DESC,sesiones_completadas DESC,e.id LIMIT 100"
         );

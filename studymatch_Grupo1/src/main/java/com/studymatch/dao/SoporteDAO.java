@@ -17,4 +17,7 @@ public interface SoporteDAO {
         String asunto,
         String mensaje
     );
+
+    int contarReportes(long reportadoId);
+    int priorizar(long solicitudId);
 }

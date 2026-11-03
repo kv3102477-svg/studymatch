@@ -60,7 +60,7 @@ public class ApiErrors {
         );
     }
 
-    @ExceptionHandler({ org.springframework.mail.MailException.class, java.io.IOException.class })
+    @ExceptionHandler({ org.springframework.mail.MailException.class, java.io.IOException.class, java.io.UncheckedIOException.class })
     ResponseEntity<?> unavailable(Exception ex) {
         return ResponseEntity.status(503).body(
             Map.of("error", "No se pudo completar el envío. Inténtalo de nuevo más tarde.")

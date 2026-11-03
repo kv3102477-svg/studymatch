@@ -18,10 +18,13 @@ public class C_Perfil {
 
     private final EstudianteService estudianteService;
     private final ProgresoService progresoService;
+    private final com.studymatch.service.SuscripcionService suscripcionService;
 
-    public C_Perfil(EstudianteService estudianteService, ProgresoService progresoService) {
+    public C_Perfil(EstudianteService estudianteService, ProgresoService progresoService,
+        com.studymatch.service.SuscripcionService suscripcionService) {
         this.estudianteService = estudianteService;
         this.progresoService = progresoService;
+        this.suscripcionService = suscripcionService;
     }
 
     private long student(HttpSession session) {
@@ -67,7 +70,20 @@ public class C_Perfil {
     }
 
     @GetMapping("/ranking")
-    public Object ranking() {
+    public Object ranking(HttpSession s) {
+        suscripcionService.exigirPro(student(s));
         return progresoService.ranking();
+    }
+
+    @GetMapping("/perfil/constancia/pdf")
+    public org.springframework.http.ResponseEntity<byte[]> constanciaPdf(HttpSession s){
+        return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+            .header("Content-Disposition","attachment; filename=Constancia_StudyMatch.pdf").body(progresoService.constanciaPdf(student(s)));
+    }
+
+    @GetMapping("/perfil/reporte/pdf")
+    public org.springframework.http.ResponseEntity<byte[]> reportePdf(HttpSession s,@org.springframework.web.bind.annotation.RequestParam(required=false) Long materia){
+        return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+            .header("Content-Disposition","attachment; filename=Reporte_StudyMatch.pdf").body(progresoService.reportePersonalPdf(student(s),materia));
     }
 }

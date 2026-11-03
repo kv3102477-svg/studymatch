@@ -43,4 +43,19 @@ public interface SuscripcionDAO {
 
     /** Marca las suscripciones cuyo vencimiento ya pasó. */
     int expirarVencidas();
+
+    /** Registra un pago de demostración y devuelve su identificador. */
+    long registrarPagoDemo(long estudiante, long plan, String modalidad, java.math.BigDecimal monto,
+        String moneda, String estado, String comprobante);
+
+    /** Sustituye el plan vigente conservando su historial. */
+    void activarPlan(long estudiante, long plan, int dias);
+
+    /** Comprueba el acceso Pro con las fechas del servidor. */
+    boolean tienePro(long estudiante);
+
+    /** Cuenta los emparejamientos iniciados durante este mes. */
+    long emparejamientosDelMes(long estudiante);
+
+    List<Map<String, Object>> pagoDemoAnterior(long estudiante, String comprobante);
 }

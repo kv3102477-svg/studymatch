@@ -38,12 +38,14 @@ public class JdbcSuscripcionDAO implements SuscripcionDAO {
 
     @Override
     public int cancelar(long suscripcionId, long estudianteId) {
-        return sql.update(
+        int actualizadas = sql.update(
             "UPDATE suscripcion SET estado='EXPIRADO',fecha_vencimiento=CURRENT_DATE WHERE id=? " +
                 "AND estudiante_id=? AND estado IN ('ACTIVO','TRIAL')",
             suscripcionId,
             estudianteId
         );
+        if (actualizadas > 0) crearGratuita(estudianteId);
+        return actualizadas;
     }
 
     @Override
@@ -58,7 +60,7 @@ public class JdbcSuscripcionDAO implements SuscripcionDAO {
     @Override
     public Map<String, Object> buscarPlan(long planId) {
         return sql.one(
-            "SELECT id,nombre,precio,moneda FROM plan WHERE id=? AND activo=true",
+            "SELECT id,nombre,precio,moneda,periodo FROM plan WHERE id=? AND activo=true",
             planId
         );
     }
@@ -98,7 +100,7 @@ public class JdbcSuscripcionDAO implements SuscripcionDAO {
     @Override
     public List<Map<String, Object>> buscarVigente(long estudianteId) {
         return sql.list(
-            "SELECT id FROM suscripcion WHERE estudiante_id=? AND estado IN ('ACTIVO','TRIAL') " +
+            "SELECT id,plan_id FROM suscripcion WHERE estudiante_id=? AND estado IN ('ACTIVO','TRIAL') " +
                 "AND fecha_vencimiento>=CURRENT_DATE",
             estudianteId
         );
@@ -121,5 +123,46 @@ public class JdbcSuscripcionDAO implements SuscripcionDAO {
             "UPDATE suscripcion SET estado='EXPIRADO' WHERE estado IN ('TRIAL','ACTIVO') AND " +
                 "fecha_vencimiento<CURRENT_DATE"
         );
+    }
+
+    @Override
+    public long registrarPagoDemo(long estudiante, long plan, String modalidad,
+        java.math.BigDecimal monto, String moneda, String estado, String comprobante) {
+        return sql.insert("INSERT INTO pago(estudiante_id,plan_id,modalidad,monto,moneda,estado,"
+            + "numero_comprobante,codigo_autorizacion,marca_tarjeta) VALUES (?,?,?,?,?,?,?,?,?)",
+            estudiante, plan, modalidad, monto, moneda, estado, comprobante,
+            "DEMO-" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0,12), "SIMULADO");
+    }
+
+    @Override
+    public void activarPlan(long estudiante, long plan, int dias) {
+        var base = sql.one("SELECT COALESCE(MAX(fecha_vencimiento),CURRENT_DATE) AS fecha "
+            + "FROM suscripcion WHERE estudiante_id=? AND plan_id=? AND estado IN ('ACTIVO','TRIAL') "
+            + "AND fecha_vencimiento>=CURRENT_DATE", estudiante, plan).get("fecha");
+        var inicio = java.time.LocalDate.parse(base.toString());
+        var vencimiento = dias == 30 ? inicio.plusMonths(1) : inicio.plusDays(dias);
+        sql.update("UPDATE suscripcion SET estado='EXPIRADO' WHERE estudiante_id=? "
+            + "AND estado IN ('TRIAL','ACTIVO','GRATUITO')", estudiante);
+        sql.update("INSERT INTO suscripcion(estudiante_id,plan_id,estado,es_trial,fecha_inicio,fecha_vencimiento) "
+            + "VALUES (?,?,'ACTIVO',false,CURRENT_DATE,?)", estudiante, plan, java.sql.Date.valueOf(vencimiento));
+    }
+
+    @Override
+    public boolean tienePro(long estudiante) {
+        return (Boolean) sql.one("SELECT EXISTS(SELECT 1 FROM suscripcion WHERE estudiante_id=? "
+            + "AND estado IN ('ACTIVO','TRIAL') AND fecha_inicio<=CURRENT_DATE "
+            + "AND fecha_vencimiento>=CURRENT_DATE) AS pro", estudiante).get("pro");
+    }
+
+    @Override
+    public long emparejamientosDelMes(long estudiante) {
+        return ((Number) sql.one("SELECT count(*) AS total FROM emparejamiento WHERE proponente_id=? "
+            + "AND creado_en>=date_trunc('month',CURRENT_TIMESTAMP)", estudiante).get("total")).longValue();
+    }
+
+    @Override
+    public List<Map<String, Object>> pagoDemoAnterior(long estudiante, String comprobante) {
+        return sql.list("SELECT id,plan_id,estado FROM pago WHERE estudiante_id=? AND numero_comprobante=?",
+            estudiante, comprobante);
     }
 }

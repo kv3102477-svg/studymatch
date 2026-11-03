@@ -51,6 +51,8 @@ public class DisponibilidadService {
     /** Valida todos los bloques antes de reemplazar el horario guardado. */
     @Transactional
     public void replaceAvailability(long student, List<Map<String, Object>> slots) {
+        if (slots.isEmpty()) throw new ResponseStatusException(
+            BAD_REQUEST, "Selecciona al menos una franja horaria");
         if (slots.size() > 168) throw new ResponseStatusException(
             BAD_REQUEST,
             "Hay demasiados bloques horarios."

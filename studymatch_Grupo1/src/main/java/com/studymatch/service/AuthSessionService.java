@@ -36,16 +36,12 @@ public class AuthSessionService {
     }
 
     public Map<String, Object> establish(Map<String, Object> profile, HttpServletRequest request) {
+        Object claveHash = estudianteDAO.claveGuardada(((Number) profile.get("id")).longValue()).get("contrasena_hash");
         request.getSession().invalidate();
         HttpSession session = request.getSession(true);
         session.setMaxInactiveInterval(1800);
         session.setAttribute("studentId", ((Number) profile.get("id")).longValue());
-        session.setAttribute(
-            "authVersion",
-            estudianteDAO
-                .claveGuardada(((Number) profile.get("id")).longValue())
-                .get("contrasena_hash")
-        );
+        session.setAttribute("authVersion", claveHash);
         String csrf = UUID.randomUUID().toString();
         session.setAttribute("csrf", csrf);
         return Map.of("estudiante", profile, "csrf", csrf);

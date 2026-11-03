@@ -11,6 +11,7 @@ import com.studymatch.dao.DisponibilidadDAO;
 import com.studymatch.dao.EstudianteDAO;
 import com.studymatch.dao.MateriaDAO;
 import com.studymatch.dao.SuscripcionDAO;
+import com.studymatch.dao.SesionDAO;
 import com.studymatch.model.Registro;
 import java.util.Locale;
 import java.util.Map;
@@ -29,6 +30,7 @@ public class EstudianteService {
     private final EstudianteDAO estudianteDAO;
     private final MateriaDAO materiaDAO;
     private final SuscripcionDAO suscripcionDAO;
+    private final SesionDAO sesionDAO;
     private final BCryptPasswordEncoder passwords = new BCryptPasswordEncoder(12);
 
     public EstudianteService(
@@ -36,13 +38,15 @@ public class EstudianteService {
         DisponibilidadDAO disponibilidadDAO,
         EstudianteDAO estudianteDAO,
         MateriaDAO materiaDAO,
-        SuscripcionDAO suscripcionDAO
+        SuscripcionDAO suscripcionDAO,
+        SesionDAO sesionDAO
     ) {
         this.catalogoDAO = catalogoDAO;
         this.disponibilidadDAO = disponibilidadDAO;
         this.estudianteDAO = estudianteDAO;
         this.materiaDAO = materiaDAO;
         this.suscripcionDAO = suscripcionDAO;
+        this.sesionDAO = sesionDAO;
     }
 
     /** Comprueba los límites de longitud admitidos para la contraseña. */
@@ -154,6 +158,13 @@ public class EstudianteService {
 
     @Transactional
     public Object delete(long student) {
+        boolean pendientes = sesionDAO.listarDelEstudiante(student).stream()
+            .anyMatch(sesion -> "CONFIRMADA".equals(sesion.get("estado"))
+                && sesion.get("fecha_hora") instanceof java.sql.Timestamp fecha
+                && fecha.toLocalDateTime().isAfter(java.time.LocalDateTime.now()));
+        if (pendientes) throw new ResponseStatusException(
+            org.springframework.http.HttpStatus.CONFLICT,
+            "Tienes sesiones confirmadas pendientes. Cancélalas antes de eliminar tu cuenta");
         estudianteDAO.desactivar(student);
 
         return Map.of("mensaje", "Cuenta desactivada.");

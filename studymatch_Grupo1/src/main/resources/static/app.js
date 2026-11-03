@@ -1044,6 +1044,14 @@ async function sendMessage() {
     $("chat-messages-container").scrollTop = $("chat-messages-container").scrollHeight;
 }
 async function loadRanking() {
+    const access = await api("/suscripciones/acceso");
+    if (!access.pro) {
+        show("ranking-empty-state", true);
+        show("ranking-table-container", false);
+        show("ranking-podium-container", false);
+        $("ranking-empty-state").innerHTML = empty("El ranking es un beneficio de Pro-Ciclo. Actívalo desde Plan Pro-Ciclo.");
+        return;
+    }
     const rows = await api("/ranking");
     show("ranking-empty-state", !rows.length);
     show("ranking-table-container", !!rows.length);
@@ -1051,7 +1059,7 @@ async function loadRanking() {
     $("ranking-table-body").innerHTML = rows
         .map(
             (r, i) =>
-                `<tr style="border-bottom:1px solid var(--border-color);"><td style="padding:16px;">${i + 1}</td><td style="padding:16px;"><strong>${escapeHtml(r.nombre)}</strong><p style="font-size:11px;color:var(--text-muted);">${escapeHtml(r.carrera)}</p></td><td>${escapeHtml(r.insignia || "Sin insignias")}</td><td>${r.sesiones_completadas}</td><td>${Number(r.horas_ensenadas).toFixed(1)}h</td></tr>`,
+                `<tr style="border-bottom:1px solid var(--border-color);"><td style="padding:16px;">${r.posicion || i + 1}</td><td style="padding:16px;"><strong>${escapeHtml(r.nombre)}</strong><p style="font-size:11px;color:var(--text-muted);">${escapeHtml(r.carrera)}</p></td><td>${escapeHtml(r.insignia || "Sin insignias")}</td><td>${r.sesiones_completadas}</td><td>${Number(r.horas_ensenadas).toFixed(1)}h</td></tr>`,
         )
         .join("");
     $("ranking-podium-container").replaceChildren();
@@ -1075,7 +1083,7 @@ async function loadRanking() {
     show("ranking-propio-card", index >= 0, "flex");
     if (index >= 0) {
         setText("mi-ranking-avatar", initials(currentUser.nombre));
-        setText("mi-ranking-titulo", `Puesto #${index + 1} · ${currentUser.nombre}`);
+        setText("mi-ranking-titulo", `Puesto #${rows[index].posicion || index + 1} · ${currentUser.nombre}`);
         setText("mi-ranking-horas", Number(rows[index].horas_ensenadas).toFixed(1) + "h");
         setText("mi-ranking-badge", "Tu posición actual");
     }
@@ -1084,8 +1092,8 @@ async function loadSubscriptions() {
     [subscriptions, plans] = await Promise.all([api("/suscripciones"), api("/planes")]);
     const active = subscriptions.find((s) => ["ACTIVO", "TRIAL"].includes(s.estado_actual));
     const latest = active || subscriptions[0];
-    const name = latest?.plan || "Plan gratuito",
-        state = latest?.estado_actual || "Sin suscripción";
+    const name = active?.plan || "Plan Gratuito",
+        state = active?.estado_actual || "GRATUITO";
     for (const id of ["mi-plan-card-titulo", "rf37-titulo-plan"]) setText(id, name);
     for (const id of ["rf34-top-text", "mi-plan-card-badge", "rf37-badge-activa"])
         setText(id, state);
@@ -1097,6 +1105,10 @@ async function loadSubscriptions() {
             ? "Consulta la fecha de vencimiento de tu plan."
             : "Puedes consultar los planes disponibles.",
     );
+    setText("current-plan-match", active ? "Emparejamientos ilimitados" : "5 emparejamientos al mes");
+    setText("current-plan-filters", active ? "Filtros avanzados de búsqueda" : "Búsqueda básica por nombre y materia");
+    setText("current-plan-ranking", active ? "Acceso al ranking de mentores" : "Ranking disponible con Pro-Ciclo");
+    setText("current-plan-badge", active ? "Distintivo Pro en el perfil" : "Insignias por horas de mentoría");
     const activePlan = plans.find((p) => p.id === active?.plan_id);
     document
         .querySelectorAll("[data-plan-benefits]")
@@ -1132,6 +1144,28 @@ async function loadSubscriptions() {
         : '<tr><td colspan="8" style="padding:28px;text-align:center;">No tienes pagos registrados.</td></tr>';
 }
 let selectedPlan = null;
+let paymentReference = null;
+let paymentBusy = false;
+let lastDemoPayment = null;
+function updatePaymentMode() {
+    const monthly = $("radio-modalidad-mensual")?.checked;
+    const plan = plans.find(p => Number(p.precio) > 0 &&
+        (monthly ? /mes/i.test(p.periodo) && !/seman/i.test(p.periodo) : /seman|ciclo/i.test(p.periodo)));
+    if (plan) selectedPlan = plan;
+    if (!selectedPlan) return;
+    const amount = `${selectedPlan.moneda} ${Number(selectedPlan.precio).toFixed(2)}`;
+    setText("rf36-txt-monto-final", Number(selectedPlan.precio).toFixed(2));
+    setText("rf36-btn-monto", amount);
+    setText("btn-confirmar-pago-pasarela", "Activar Pro · " + amount + "");
+    for (const mode of ["mensual", "semestral"]) {
+        const radio = $("radio-modalidad-" + mode);
+        const label = radio?.closest("label");
+        if (label) {
+            label.style.borderColor = radio.checked ? "#b60d30" : "#e2e8f0";
+            label.style.background = radio.checked ? "#fef2f2" : "white";
+        }
+    }
+}
 function openPlan(id) {
     selectedPlan = plans.find((p) => p.id === Number(id));
     if (!selectedPlan) return;
@@ -1139,7 +1173,7 @@ function openPlan(id) {
     setText("rf35-modal-periodo", selectedPlan.periodo);
     setText(
         "rf35-modal-precio",
-        `${selectedPlan.moneda} ${Number(selectedPlan.precio).toFixed(2)}`,
+        Number(selectedPlan.precio).toFixed(2),
     );
     if ($("rf35-modal-lista-beneficios"))
         $("rf35-modal-lista-beneficios").innerHTML = selectedPlan.beneficios
@@ -1148,6 +1182,9 @@ function openPlan(id) {
     show("modal-contratacion-plan", true, "flex");
 }
 function openDemoPayment() {
+    paymentReference = crypto.randomUUID();
+    setText("rf36-exito-comprobante", "—");
+    $("rf36-input-titular").value = currentUser?.nombre || "";
     if (!selectedPlan) throw new Error("Selecciona un plan.");
     show("modal-contratacion-plan", false);
     show("modal-pasarela-pago", true, "flex");
@@ -1156,30 +1193,52 @@ function openDemoPayment() {
     setText("rf36-txt-monto-final", price);
     setText("rf36-btn-monto", price);
     setText("demo-payment-price", price);
+    updatePaymentMode();
+    const simulationTools = $("btn-rf36-sim-exito")?.parentElement?.parentElement;
+    if (simulationTools) simulationTools.style.display = "none";
 }
 async function paymentDemo(scenario = "APROBADO") {
+    if (paymentBusy) return;
     if (!selectedPlan) throw new Error("Selecciona un plan.");
-    const result = await api("/pagos/prueba", "POST", {
-        plan_id: selectedPlan.id,
-        escenario: scenario,
-    });
-    if (result.estado === "APROBADO") {
-        show("modal-pasarela-pago", false);
-        setText(
-            "rf36-exito-monto",
-            `${result.plan.moneda} ${Number(result.plan.precio).toFixed(2)} (demostración)`,
-        );
-        show("modal-pago-exito", true, "flex");
-    } else {
-        setText(
-            "rf36-banner-error-title",
-            result.estado === "TIMEOUT" ? "Demora de prueba" : "Rechazo de prueba",
-        );
-        setText("rf36-banner-error-desc", result.mensaje);
-        show("rf36-banner-error", true, "flex");
+    const card = $("rf36-input-tarjeta").value.replace(/\s/g, "");
+    if (scenario === "APROBADO") {
+        if (card !== "4111111111111111") throw new Error("Tarjeta no habilitada para esta presentación.");
+        if (!/^\d{2}\/\d{2}$/.test($("rf36-input-vence").value) ||
+            !/^\d{3}$/.test($("rf36-input-cvv").value) ||
+            !$("rf36-input-titular").value.trim())
+            throw new Error("Completa el titular, vencimiento MM/AA y CVV de tres dígitos.");
+        const [month, year] = $("rf36-input-vence").value.split("/").map(Number);
+        if (month < 1 || month > 12 || new Date(2000 + year, month, 1) <= new Date())
+            throw new Error("La fecha de vencimiento no es válida.");
     }
-    notify(result.mensaje, result.estado !== "APROBADO");
+    paymentBusy = true;
+    $("btn-confirmar-pago-pasarela").disabled = true;
+    try {
+        const result = await api("/pagos/prueba", "POST", {
+            plan_id: selectedPlan.id, escenario: scenario,
+            referencia: paymentReference || (paymentReference = crypto.randomUUID()),
+            tarjeta_prueba: card, renovar: true,
+        });
+        if (result.estado === "APROBADO") {
+            lastDemoPayment = result.pago_id;
+            setText("rf36-exito-comprobante", result.numero_comprobante);
+            show("modal-pasarela-pago", false);
+            setText("rf36-exito-monto", `${result.plan.moneda} ${Number(result.plan.precio).toFixed(2)}`);
+            show("modal-pago-exito", true, "flex");
+            await loadSubscriptions();
+        } else {
+            paymentReference = crypto.randomUUID();
+            setText("rf36-banner-error-title", result.estado === "TIMEOUT" ? "Tiempo de espera agotado" : "Pago rechazado");
+            setText("rf36-banner-error-desc", result.mensaje);
+            show("rf36-banner-error", true, "flex");
+        }
+        notify(result.estado === "APROBADO" ? "Plan Pro-Ciclo activado correctamente." : result.estado === "TIMEOUT" ? "Se agotó el tiempo de espera. Intenta nuevamente." : "Pago rechazado. Revisa los datos e intenta nuevamente.", result.estado !== "APROBADO");
+    } finally {
+        paymentBusy = false;
+        $("btn-confirmar-pago-pasarela").disabled = false;
+    }
 }
+
 async function loadDocuments() {
     const rows = await api("/documentos");
     $("uploaded-files-list").innerHTML = rows.length
@@ -1451,7 +1510,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         },
         "change",
     );
-    on("btn-manual-search", loadSearch);
+    on("btn-manual-search", async () => {
+        const resultado=await api("/emparejamientos/buscar","POST");
+        await loadSearch();
+        notify(resultado.encontrado ? "Nuevo compañero encontrado." : "No hay compañeros disponibles con tus materias y horarios.");
+    });
     let searchTimer;
     $("search-input").addEventListener("input", () => {
         clearTimeout(searchTimer);
@@ -1637,7 +1700,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         on(id, () => navigate("suscripcion-section"));
     on("btn-mi-plan-aprovechar", () => navigate("buscar-section"));
     on("btn-contratar-plan-oficial", () => {
-        const paid = plans.find((p) => Number(p.precio) > 0);
+        const paid = plans.find((p) => Number(p.precio) > 0 && /seman|ciclo/i.test(p.periodo)) || plans.find((p) => Number(p.precio) > 0);
         if (!paid) throw new Error("Todavía no hay planes disponibles.");
         openPlan(paid.id);
     });
@@ -1647,7 +1710,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (
             await appDialog({
                 title: "Cancelar suscripción",
-                description: "¿Quieres cancelar tu suscripción ahora?",
+                description: "Volverás al Plan Gratuito: 5 emparejamientos al mes, búsqueda básica y sin acceso al ranking. Tu historial se conserva.",
                 confirm: "Cancelar suscripción",
             })
         ) {
@@ -1664,6 +1727,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         notify("Prueba gratuita activada.");
     });
     on("btn-confirmar-plan-real", openDemoPayment);
+    on("btn-cancelar-oferta", () => show("modal-contratacion-plan", false));
+    on("radio-modalidad-mensual", updatePaymentMode, "change");
+    on("radio-modalidad-semestral", updatePaymentMode, "change");
+    for (const field of ["rf36-input-tarjeta", "rf36-input-vence", "rf36-input-cvv", "rf36-input-titular"])
+        on(field, event => { if (event.key === "Enter") { event.preventDefault(); return paymentDemo(); } }, "keydown");
+    on("btn-descargar-boleta-pdf", () => {
+        if (!lastDemoPayment) throw new Error("No hay un comprobante de esta simulación.");
+        return downloadDocument(`/api/pagos/${lastDemoPayment}/comprobante/pdf`, "Comprobante_DEMO_StudyMatch.pdf");
+    });
     on("btn-confirmar-pago-pasarela", () => paymentDemo());
     on("btn-rf36-sim-exito", () => paymentDemo("APROBADO"));
     on("btn-rf36-sim-rechazo", () => paymentDemo("RECHAZADO"));
@@ -1679,7 +1751,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     on("btn-rf38-banner-ver-popup", () => navigate("suscripcion-section"));
     on("btn-rf38-banner-cerrar", () => show("rf38-banner-amarillo-dashboard", false));
     on("select-filtro-curso-reporte", reports, "change");
-    on("btn-descargar-reporte-pdf", () => window.print());
+    on("btn-descargar-reporte-pdf", () => {
+        const materia=$("select-filtro-curso-reporte").value;
+        return downloadDocument("/api/perfil/reporte/pdf"+(materia?"?materia="+encodeURIComponent(materia):""),"Reporte_StudyMatch.pdf");
+    });
     document.addEventListener(
         "click",
         handle(async (event) => {
@@ -1714,10 +1789,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 drawSchedule();
             } else if (el.dataset.plan) openPlan(el.dataset.plan);
             else if (el.dataset.receipt) {
-                const p = await api("/pagos/" + el.dataset.receipt + "/comprobante");
-                notify(
-                    `Registro ${p.numero_comprobante || p.id}: ${p.moneda} ${p.monto} · ${p.estado}`,
-                );
+                await downloadDocument("/api/pagos/"+el.dataset.receipt+"/comprobante/pdf","Comprobante_StudyMatch.pdf");
             } else if (el.dataset.sessionAction) {
                 const id = Number(el.dataset.session),
                     action = el.dataset.sessionAction,
@@ -1753,7 +1825,13 @@ document.addEventListener("DOMContentLoaded", async () => {
                     if (!link) return;
                     data.enlace = link;
                 }
-                const updated = await api(`/sesiones/${id}/${action}`, "POST", data);
+                let updated;
+                try { updated=await api(`/sesiones/${id}/${action}`,"POST",data); }
+                catch(error){
+                    if(action!=="finalizar" || !error.message.includes("menor de cinco minutos"))throw error;
+                    if(!await appDialog({title:"Sesión breve",description:"La duración es menor de cinco minutos. ¿Confirmas la finalización?",confirm:"Confirmar finalización"}))return;
+                    updated=await api(`/sesiones/${id}/${action}`,"POST",{confirmar_duracion_corta:true});
+                }
                 if (action === "iniciar") {
                     window.location.assign(updated.enlace_videollamada);
                     return;
@@ -1792,3 +1870,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         $("btn-login").disabled = false;
     }
 });
+
+// Descarga real. El selector nativo permite distinguir guardar y cancelar cuando está disponible.
+async function downloadDocument(url,nombre){
+    const respuesta=await fetch(url,{credentials:"same-origin"});
+    if(!respuesta.ok){let dato;try{dato=await respuesta.json();}catch{}throw new Error(dato?.error||"No se pudo descargar el documento.");}
+    const archivo=await respuesta.blob();
+    if(window.showSaveFilePicker){
+        try{
+            const destino=await window.showSaveFilePicker({suggestedName:nombre,types:[{description:"Documento PDF",accept:{"application/pdf":[".pdf"]}}]});
+            const escritura=await destino.createWritable();await escritura.write(archivo);await escritura.close();notify("Descarga exitosa.");
+        }catch(error){if(error.name!=="AbortError")throw error;notify("Descarga cancelada.");}
+    }else{
+        const enlace=document.createElement("a");enlace.href=URL.createObjectURL(archivo);enlace.download=nombre;enlace.click();
+        setTimeout(()=>URL.revokeObjectURL(enlace.href),30000);notify("Descarga iniciada.");
+    }
+}

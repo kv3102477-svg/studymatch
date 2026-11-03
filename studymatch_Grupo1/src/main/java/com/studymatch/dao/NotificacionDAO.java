@@ -22,4 +22,12 @@ public interface NotificacionDAO {
 
     /** Genera avisos de vencimiento de suscripciones sin duplicarlos. */
     int recordarVencimientos();
+
+    /** Conserva un aviso pendiente cuando no se pudo entregar al proveedor. */
+    int encolar(long estudianteId,String titulo,String mensaje,String evento,long referenciaId);
+
+    /** Devuelve avisos cuyo reintento ya puede procesarse. */
+    java.util.List<java.util.Map<String,Object>> pendientes();
+    int marcarEnviado(long id);
+    int registrarFallo(long id,String error,java.time.LocalDateTime proximoIntento);
 }

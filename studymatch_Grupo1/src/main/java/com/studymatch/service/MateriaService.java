@@ -36,6 +36,11 @@ public class MateriaService {
             !Set.of("BASICO", "INTERMEDIO", "AVANZADO").contains(level)
         ) throw new ResponseStatusException(BAD_REQUEST, "Selecciona un rol y nivel válidos.");
         long subject = number(input, "materia_id");
+        boolean repetida = materiaDAO.listarPropias(student).stream().anyMatch(materia ->
+            ((Number) materia.get("materia_id")).longValue() == subject
+            && role.equals(materia.get("tipo_rol")) && level.equals(materia.get("nivel")));
+        if (repetida) throw new ResponseStatusException(
+            org.springframework.http.HttpStatus.CONFLICT, "Esta materia ya está en tu lista");
         materiaDAO.guardarPropia(student, subject, role, level);
     }
 

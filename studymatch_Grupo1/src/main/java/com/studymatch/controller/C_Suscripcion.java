@@ -63,12 +63,21 @@ public class C_Suscripcion {
     }
 
     @PostMapping("/pagos/prueba")
-    public Object paymentDemo(@RequestBody Map<String, Object> input) {
-        return suscripcionService.paymentDemo(input);
+    public Object paymentDemo(HttpSession s, @RequestBody Map<String, Object> input) {
+        return suscripcionService.paymentDemo(student(s), input);
     }
+
+    @GetMapping("/suscripciones/acceso")
+    public Object acceso(HttpSession s) { return suscripcionService.acceso(student(s)); }
 
     @GetMapping("/pagos/{id}/comprobante")
     public Object receipt(HttpSession s, @PathVariable long id) {
         return suscripcionService.receipt(student(s), id);
+    }
+
+    @GetMapping("/pagos/{id}/comprobante/pdf")
+    public org.springframework.http.ResponseEntity<byte[]> comprobantePdf(HttpSession s,@PathVariable long id){
+        return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+            .header("Content-Disposition","attachment; filename=Comprobante_StudyMatch.pdf").body(suscripcionService.comprobantePdf(student(s),id));
     }
 }
